@@ -1,9 +1,12 @@
 const bcrypt = require("bcrypt");
 const gravatar = require("gravatar");
+const { v4: uuidv4 } = require("uuid");
 
 
 const { User, schemas } = require("../../models/user");
-const { HttpError } = require("../../helpers");
+const { HttpError, sendVerificationEmail } = require("../../helpers");
+
+
 
 const singUp = async (req, res, next) => {
   try {
@@ -18,8 +21,11 @@ const singUp = async (req, res, next) => {
     const user = await User.findOne({ email });
 
     if (user) {
-      throw HttpError(409, "Email in use");
+      throw newHttpError(409, "Email in use");
+
     }
+
+      const verificationToken = uuidv4();
 
     const hashPassword = await bcrypt.hash(password, 10);
     const avatarURL = gravatar.url(email);
@@ -28,12 +34,17 @@ const singUp = async (req, res, next) => {
       ...req.body,
       password: hashPassword,
       avatarURL,
+      verificationToken,
     });
+
+     await sendVerificationEmail(email, verificationToken);
 
     const responseUser = {
       email: newUser.email,
       subscription: newUser.subscription,
     };
+
+    
 
     res.status(201).json({ user: responseUser });
   } catch (error) {
